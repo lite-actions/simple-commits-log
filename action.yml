@@ -1,0 +1,43 @@
+name: Simple Commits Log
+description: >-
+  Maintain a simple CHANGELOG.md entry for the latest commit merged to main,
+  including the date, commit type, short SHA, and message.
+author: mrdoodles
+
+branding:
+  icon: list
+  color: blue
+
+inputs:
+  commit:
+    description: >-
+      Commit/ref to log. Defaults to the push event's `after` SHA, else HEAD.
+    required: false
+    default: ""
+  title:
+    description: Heading used when the changelog file is first created.
+    required: false
+    default: "Changelog"
+  output-file:
+    description: File to write the changelog to.
+    required: false
+    default: "CHANGELOG.md"
+
+outputs:
+  changed:
+    description: "true if a new changelog entry was written."
+    value: ${{ steps.gen.outputs.changed }}
+  file:
+    description: The path the changelog was written to.
+    value: ${{ steps.gen.outputs.file }}
+
+runs:
+  using: composite
+  steps:
+    - id: gen
+      shell: bash
+      env:
+        INPUT_COMMIT: ${{ inputs.commit }}
+        INPUT_TITLE: ${{ inputs.title }}
+        INPUT_OUTPUT_FILE: ${{ inputs.output-file }}
+      run: bash "${GITHUB_ACTION_PATH}/scripts/generate.sh"

@@ -1,0 +1,74 @@
+name: Changelog
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - CHANGELOG.md
+
+permissions:
+  contents: read
+
+concurrency:
+  group: changelog
+  cancel-in-progress: false
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: lite-actions/git-checkout@90733d329cd6c632c7597660341002e1a1377c44 # v1.1.0
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.CHANGELOG_BOT_TOKEN || github.token }}
+
+      - name: Update changelog
+        id: changelog
+        uses: ./
+
+      - name: Name the branch
+        id: branch
+        if: steps.changelog.outputs.changed == 'true'
+        run: echo "branch=chore/changelog-${GITHUB_RUN_ID}" >> "${GITHUB_OUTPUT}"
+
+      - name: Commit the changelog
+        if: steps.changelog.outputs.changed == 'true'
+        uses: lite-actions/signed-commit@v1
+        with:
+          branch: ${{ steps.branch.outputs.branch }}
+          create-branch: true
+          base-sha: ${{ github.sha }}
+          message: "docs(changelog): update changelog"
+          files: |
+            CHANGELOG.md
+          token: ${{ secrets.CHANGELOG_BOT_TOKEN }}
+
+      - name: Open, approve and auto-merge changelog PR
+        if: steps.changelog.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.CHANGELOG_BOT_TOKEN }}
+          APPROVE_TOKEN: ${{ secrets.CHANGELOG_APPROVE_TOKEN }}
+          BRANCH: ${{ steps.branch.outputs.branch }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ] || [ -z "${APPROVE_TOKEN:-}" ]; then
+            echo "::warning::CHANGELOG_BOT_TOKEN / CHANGELOG_APPROVE_TOKEN not set; skipping changelog PR."
+            exit 0
+          fi
+          gh pr create --base main --head "${BRANCH}" \
+            --title "docs(changelog): update changelog" \
+            --body "Automated changelog update from the latest merge to \`main\`."
+          GH_TOKEN="${APPROVE_TOKEN}" gh pr review "${BRANCH}" --approve \
+            --body "Automated approval of changelog update."
+          gh pr merge "${BRANCH}" --auto --squash --delete-branch
+
+      - name: Clean up on failure
+        if: failure() && steps.changelog.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.CHANGELOG_BOT_TOKEN }}
+        run: |
+          branch="chore/changelog-${GITHUB_RUN_ID}"
+          gh pr close "${branch}" --delete-branch 2>/dev/null || true
+          gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${branch}" 2>/dev/null || true
+          echo "Cleaned up ${branch} (if it existed)."
