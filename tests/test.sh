@@ -43,6 +43,8 @@ git commit -q --allow-empty -F - <<'MSG'
 Merge pull request #12 from lite-actions/fix-empty-payload
 
 fix: handle empty payload
+
+This paragraph should not replace the PR title.
 MSG
 sha2="$(git rev-parse HEAD)"
 date2="$(git log -1 --format=%cs HEAD)"
@@ -51,7 +53,12 @@ GITHUB_REPOSITORY="acme/widget" INPUT_COMMIT=HEAD bash "${GEN}" >/dev/null 2>&1
 
 assert "merge commit logs clickable short sha and parsed type" \
   grep -qE "^${date2} fix \[[0-9a-f]{7,}\]\(https://github\.com/acme/widget/commit/${sha2}\) <!-- simple-commits-log:${sha2} -->$" CHANGELOG.md
-assert "merge body message used" grep -q '^handle empty payload$' CHANGELOG.md
+assert "merge PR title used instead of description" grep -q '^handle empty payload$' CHANGELOG.md
+if grep -q '^This paragraph should not replace the PR title\.$' CHANGELOG.md; then
+  check "merge description paragraph not used as message" 1
+else
+  check "merge description paragraph not used as message" 0
+fi
 line_new="$(grep -n '^handle empty payload$' CHANGELOG.md | cut -d: -f1 | head -n1)"
 line_old="$(grep -n '^add audit log$' CHANGELOG.md | cut -d: -f1 | head -n1)"
 assert "latest entry prepended" test "${line_new}" -lt "${line_old}"

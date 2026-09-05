@@ -17,3 +17,8 @@ steps:
 
 On a `push` event the action defaults to the push event's `after` SHA, so it
 logs the latest commit that landed on `main`.
+
+To persist the generated changelog from a workflow, grant at least
+`permissions: { contents: write }`. If your workflow updates `main` through a
+PR like this repository does, it also needs `pull-requests: write` plus a token
+that can push or open PRs.

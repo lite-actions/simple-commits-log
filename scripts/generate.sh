@@ -25,6 +25,7 @@ short_sha="$(git rev-parse --short "${sha}")"
 date="$(git log -1 --format=%cs "${sha}")"
 subject="$(git log -1 --format=%s "${sha}")"
 body="$(git log -1 --format=%b "${sha}")"
+full_message="$(git log -1 --format=%B "${sha}")"
 
 render_ref() {
   if [ -n "${GITHUB_REPOSITORY:-}" ]; then
@@ -35,10 +36,10 @@ render_ref() {
   fi
 }
 
-merge_body_line="$(printf '%s\n' "${body}" | sed -n '/./{p;q;}')"
 source_line="${subject}"
-if printf '%s' "${subject}" | grep -Eq '^Merge pull request #[0-9]+' && [ -n "${merge_body_line}" ]; then
-  source_line="${merge_body_line}"
+merge_title="$(printf '%s\n' "${full_message}" | awk 'NR == 1 { next } seen_blank && NF { print; exit } !seen_blank && NF == 0 { seen_blank = 1 }')"
+if printf '%s' "${subject}" | grep -Eq '^Merge pull request #[0-9]+' && [ -n "${merge_title}" ]; then
+  source_line="${merge_title}"
 fi
 
 type="other"
