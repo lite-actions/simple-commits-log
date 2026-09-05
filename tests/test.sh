@@ -34,7 +34,7 @@ export GITHUB_OUTPUT="${tmp}/out1"
 INPUT_COMMIT=HEAD bash "${GEN}" >/dev/null 2>&1
 
 grep -q '^# Changelog$' CHANGELOG.md; check "default heading created" $?
-grep -q "^${date1} feat ${short1}$" CHANGELOG.md; check "entry header uses date type and short sha" $?
+grep -qE "^${date1} feat ${short1} <!-- simple-commits-log:${sha1} -->$" CHANGELOG.md; check "entry header uses date type and short sha" $?
 grep -q '^add audit log$' CHANGELOG.md; check "message written on following line" $?
 grep -q '^changed=true$' "${GITHUB_OUTPUT}"; check "emits changed=true" $?
 
@@ -49,7 +49,7 @@ date2="$(git log -1 --format=%cs HEAD)"
 export GITHUB_OUTPUT="${tmp}/out2"
 GITHUB_REPOSITORY="acme/widget" INPUT_COMMIT=HEAD bash "${GEN}" >/dev/null 2>&1
 
-grep -qE "^${date2} fix \[[0-9a-f]{7,}\]\(https://github\.com/acme/widget/commit/${sha2}\)$" CHANGELOG.md
+grep -qE "^${date2} fix \[[0-9a-f]{7,}\]\(https://github\.com/acme/widget/commit/${sha2}\) <!-- simple-commits-log:${sha2} -->$" CHANGELOG.md
 check "merge commit logs clickable short sha and parsed type" $?
 grep -q '^handle empty payload$' CHANGELOG.md; check "merge body message used" $?
 line_new="$(grep -n '^handle empty payload$' CHANGELOG.md | cut -d: -f1 | head -n1)"

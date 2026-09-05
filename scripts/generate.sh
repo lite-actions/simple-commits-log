@@ -46,9 +46,10 @@ fi
 
 ref="$(render_ref)"
 header="${date} ${type} ${ref}"
-entry="${header}\n${message}\n\n"
+marker="<!-- simple-commits-log:${sha} -->"
+entry="${header} ${marker}\n${message}\n\n"
 
-if [ -f "${OUT}" ] && grep -Fqx "${header}" "${OUT}"; then
+if [ -f "${OUT}" ] && grep -Fq "${marker}" "${OUT}"; then
   echo "Entry for ${short_sha} already present in ${OUT}; nothing to do."
   emit changed false
   emit file "${OUT}"
