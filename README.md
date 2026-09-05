@@ -22,3 +22,7 @@ To persist the generated changelog from a workflow, grant at least
 `permissions: { contents: write }`. If your workflow updates `main` through a
 PR like this repository does, it also needs `pull-requests: write` plus a token
 that can push or open PRs.
+
+For GitHub merge commits, the action uses the PR title line when present so
+entries still log the intended `type: message`. It also stores a hidden full-SHA
+marker with each entry so reruns do not append the same commit twice.
