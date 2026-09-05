@@ -1,0 +1,109 @@
+name: Changelog
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - CHANGELOG.md
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with bot token
+        if: ${{ secrets.CHANGELOG_BOT_TOKEN != '' }}
+        uses: lite-actions/git-checkout@90733d329cd6c632c7597660341002e1a1377c44 # v1.1.0
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.CHANGELOG_BOT_TOKEN }}
+
+      - name: Checkout with default token
+        if: ${{ secrets.CHANGELOG_BOT_TOKEN == '' }}
+        uses: lite-actions/git-checkout@90733d329cd6c632c7597660341002e1a1377c44 # v1.1.0
+        with:
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Update changelog
+        id: changelog
+        if: secrets.CHANGELOG_BOT_TOKEN != ''
+        uses: ./
+
+      - name: Warn when changelog automation is skipped
+        if: secrets.CHANGELOG_BOT_TOKEN == ''
+        run: echo "::warning::CHANGELOG_BOT_TOKEN not set; skipping changelog generation because the update cannot be persisted."
+
+      - name: Name the branch
+        id: branch
+        if: steps.changelog.outputs.changed == 'true'
+        run: echo "branch=chore/changelog-${GITHUB_RUN_ID}" >> "${GITHUB_OUTPUT}"
+
+      - name: Commit the changelog
+        if: steps.changelog.outputs.changed == 'true' && secrets.CHANGELOG_BOT_TOKEN != ''
+        uses: lite-actions/signed-commit@v1
+        with:
+          branch: ${{ steps.branch.outputs.branch }}
+          create-branch: true
+          base-sha: ${{ github.sha }}
+          message: "docs(changelog): update changelog"
+          files: |
+            CHANGELOG.md
+          token: ${{ secrets.CHANGELOG_BOT_TOKEN }}
+
+      - name: Open changelog PR
+        id: pr
+        if: steps.changelog.outputs.changed == 'true' && secrets.CHANGELOG_BOT_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ secrets.CHANGELOG_BOT_TOKEN }}
+          BRANCH: ${{ steps.branch.outputs.branch }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning::CHANGELOG_BOT_TOKEN not set; skipping changelog PR."
+            exit 0
+          fi
+          pr_url="$(gh pr create --base main --head "${BRANCH}" \
+            --title "docs(changelog): update changelog" \
+            --body "Automated changelog update from the latest merge to \`main\`." \
+            2>/dev/null || true)"
+          if [ -z "${pr_url}" ]; then
+            pr_url="$(gh pr list --head "${BRANCH}" --json url --jq '.[0].url' 2>/dev/null || true)"
+          fi
+          [ -n "${pr_url}" ]
+          echo "url=${pr_url}" >> "${GITHUB_OUTPUT}"
+
+      - name: Approve and auto-merge changelog PR
+        if: steps.changelog.outputs.changed == 'true' && steps.pr.outputs.url != ''
+        env:
+          GH_TOKEN: ${{ secrets.CHANGELOG_BOT_TOKEN }}
+          APPROVE_TOKEN: ${{ secrets.CHANGELOG_APPROVE_TOKEN }}
+          PR_URL: ${{ steps.pr.outputs.url }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APPROVE_TOKEN:-}" ]; then
+            echo "::warning::CHANGELOG_APPROVE_TOKEN not set; skipping approval/auto-merge."
+            exit 0
+          fi
+          GH_TOKEN="${APPROVE_TOKEN}" gh pr review "${PR_URL}" --approve \
+            --body "Automated approval of changelog update."
+          GH_TOKEN="${APPROVE_TOKEN}" gh pr merge "${PR_URL}" --auto --squash --delete-branch
+
+      - name: Clean up on failure
+        if: failure() && steps.branch.outputs.branch != ''
+        env:
+          GH_TOKEN: ${{ secrets.CHANGELOG_BOT_TOKEN }}
+          BRANCH: ${{ steps.branch.outputs.branch }}
+          PR_URL: ${{ steps.pr.outputs.url }}
+        run: |
+          ref_branch="$(printf '%s' "${BRANCH}" | sed 's|/|%2F|g')"
+          [ -n "${PR_URL:-}" ] && gh pr close "${PR_URL}" --delete-branch 2>/dev/null || true
+          gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${ref_branch}" 2>/dev/null || true
+          echo "Cleaned up ${BRANCH} (if it existed)."

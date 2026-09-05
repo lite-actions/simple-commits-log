@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${GITHUB_OUTPUT:=/dev/stdout}"
+emit() { printf '%s=%s\n' "$1" "$2" >> "${GITHUB_OUTPUT}"; }
+tmp=""
+cleanup() {
+  if [ -n "${tmp}" ]; then
+    rm -f "${tmp}"
+  fi
+}
+trap cleanup EXIT
+
+TITLE="${INPUT_TITLE:-Changelog}"
+OUT="${INPUT_OUTPUT_FILE:-CHANGELOG.md}"
+commit_ref="${INPUT_COMMIT:-}"
+
+if [ -z "${commit_ref}" ] && [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -f "${GITHUB_EVENT_PATH}" ] \
+   && command -v jq >/dev/null 2>&1; then
+  commit_ref="$(jq -r '.after // empty' "${GITHUB_EVENT_PATH}")"
+fi
+commit_ref="${commit_ref:-HEAD}"
+sha="$(git rev-parse "${commit_ref}")"
+short_sha="$(git rev-parse --short "${sha}")"
+date="$(git log -1 --format=%cs "${sha}")"
+subject="$(git log -1 --format=%s "${sha}")"
+body="$(git log -1 --format=%b "${sha}")"
+full_message="$(git log -1 --format=%B "${sha}")"
+
+render_ref() {
+  if [ -n "${GITHUB_REPOSITORY:-}" ]; then
+    printf '[%s](%s/%s/commit/%s)' \
+      "${short_sha}" "${GITHUB_SERVER_URL:-https://github.com}" "${GITHUB_REPOSITORY}" "${sha}"
+  else
+    printf '%s' "${short_sha}"
+  fi
+}
+
+source_line="${subject}"
+merge_title="$(printf '%s\n' "${full_message}" | awk 'NR == 1 { next } seen_blank && NF { print; exit } !seen_blank && NF == 0 { seen_blank = 1 }')"
+if printf '%s' "${subject}" | grep -Eq '^Merge pull request #[0-9]+' && [ -n "${merge_title}" ]; then
+  source_line="${merge_title}"
+fi
+
+type="other"
+message="${source_line}"
+if printf '%s\n' "${source_line}" | grep -Eq '^[a-z]+(\([^)]+\))?(!)?:[[:space:]]*'; then
+  type="$(printf '%s\n' "${source_line}" | sed -E 's/^([a-z]+)(\([^)]+\))?(!)?:[[:space:]]*.*/\1/')"
+  message="$(printf '%s\n' "${source_line}" | sed -E 's/^[a-z]+(\([^)]+\))?(!)?:[[:space:]]*//')"
+elif printf '%s' "${subject}" | grep -Eq '^Merge '; then
+  type="merge"
+fi
+
+ref="$(render_ref)"
+header="${date} ${type} ${ref}"
+marker="<!-- simple-commits-log:${sha} -->"
+entry="${header} ${marker}\n${message}\n\n"
+
+if [ -f "${OUT}" ] && grep -Fq "${marker}" "${OUT}"; then
+  echo "Entry for ${short_sha} already present in ${OUT}; nothing to do."
+  emit changed false
+  emit file "${OUT}"
+  exit 0
+fi
+
+if [ ! -f "${OUT}" ]; then
+  printf '# %s\n\n%b' "${TITLE}" "${entry}" > "${OUT}"
+  echo "Created ${OUT}."
+else
+  tmp="$(mktemp)"
+  if head -n 1 "${OUT}" | grep -Eq '^# '; then
+    {
+      sed -n '1p' "${OUT}"
+      printf '\n%b' "${entry}"
+      tail -n +2 "${OUT}" | sed '/./,$!d'
+    } > "${tmp}"
+  else
+    {
+      printf '%b' "${entry}"
+      cat "${OUT}"
+    } > "${tmp}"
+  fi
+  mv "${tmp}" "${OUT}"
+  echo "Updated ${OUT}."
+fi
+
+emit changed true
+emit file "${OUT}"
