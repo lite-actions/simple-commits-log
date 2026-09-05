@@ -11,7 +11,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: changelog
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -94,7 +94,7 @@ jobs:
           fi
           GH_TOKEN="${APPROVE_TOKEN}" gh pr review "${PR_URL}" --approve \
             --body "Automated approval of changelog update."
-          gh pr merge "${PR_URL}" --auto --squash --delete-branch
+          GH_TOKEN="${APPROVE_TOKEN}" gh pr merge "${PR_URL}" --auto --squash --delete-branch
 
       - name: Clean up on failure
         if: failure() && steps.branch.outputs.branch != ''
