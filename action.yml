@@ -1,6 +1,6 @@
 name: Simple Commits Log
 description: >-
-  Maintain a simple CHANGELOG.md entry for the latest commit merged to main,
+  Maintain simple CHANGELOG entries for commits merged to main,
   including the date, commit type, short SHA, and message.
 author: mrdoodles
 
