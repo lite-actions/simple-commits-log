@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -uo pipefail
+set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GEN="${ROOT}/scripts/generate.sh"
@@ -33,10 +33,10 @@ date1="$(git log -1 --format=%cs HEAD)"
 export GITHUB_OUTPUT="${tmp}/out1"
 INPUT_COMMIT=HEAD bash "${GEN}" >/dev/null 2>&1
 
-grep -q '^# Changelog$' CHANGELOG.md; check "default heading created" $?
-grep -qE "^${date1} feat ${short1} <!-- simple-commits-log:${sha1} -->$" CHANGELOG.md; check "entry header uses date type and short sha" $?
-grep -q '^add audit log$' CHANGELOG.md; check "message written on following line" $?
-grep -q '^changed=true$' "${GITHUB_OUTPUT}"; check "emits changed=true" $?
+assert "default heading created" grep -q '^# Changelog$' CHANGELOG.md
+assert "entry header uses date type and short sha" grep -qE "^${date1} feat ${short1} <!-- simple-commits-log:${sha1} -->$" CHANGELOG.md
+assert "message written on following line" grep -q '^add audit log$' CHANGELOG.md
+assert "emits changed=true" grep -q '^changed=true$' "${GITHUB_OUTPUT}"
 
 printf '\n== merge commit uses the PR title from the body\n'
 git commit -q --allow-empty -F - <<'MSG'
@@ -49,9 +49,9 @@ date2="$(git log -1 --format=%cs HEAD)"
 export GITHUB_OUTPUT="${tmp}/out2"
 GITHUB_REPOSITORY="acme/widget" INPUT_COMMIT=HEAD bash "${GEN}" >/dev/null 2>&1
 
-grep -qE "^${date2} fix \[[0-9a-f]{7,}\]\(https://github\.com/acme/widget/commit/${sha2}\) <!-- simple-commits-log:${sha2} -->$" CHANGELOG.md
-check "merge commit logs clickable short sha and parsed type" $?
-grep -q '^handle empty payload$' CHANGELOG.md; check "merge body message used" $?
+assert "merge commit logs clickable short sha and parsed type" \
+  grep -qE "^${date2} fix \[[0-9a-f]{7,}\]\(https://github\.com/acme/widget/commit/${sha2}\) <!-- simple-commits-log:${sha2} -->$" CHANGELOG.md
+assert "merge body message used" grep -q '^handle empty payload$' CHANGELOG.md
 line_new="$(grep -n '^handle empty payload$' CHANGELOG.md | cut -d: -f1 | head -n1)"
 line_old="$(grep -n '^add audit log$' CHANGELOG.md | cut -d: -f1 | head -n1)"
 assert "latest entry prepended" test "${line_new}" -lt "${line_old}"
@@ -61,7 +61,7 @@ before="$(cat CHANGELOG.md)"
 export GITHUB_OUTPUT="${tmp}/out3"
 GITHUB_REPOSITORY="acme/widget" INPUT_COMMIT=HEAD bash "${GEN}" >/dev/null 2>&1
 assert "duplicate run leaves changelog unchanged" test "${before}" = "$(cat CHANGELOG.md)"
-grep -q '^changed=false$' "${GITHUB_OUTPUT}"; check "emits changed=false for duplicate" $?
+assert "emits changed=false for duplicate" grep -q '^changed=false$' "${GITHUB_OUTPUT}"
 
 echo
 printf 'passed: %s, failed: %s\n' "${pass}" "${fail}"

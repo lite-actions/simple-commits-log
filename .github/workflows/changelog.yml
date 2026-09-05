@@ -42,7 +42,7 @@ jobs:
         run: echo "branch=chore/changelog-${GITHUB_RUN_ID}" >> "${GITHUB_OUTPUT}"
 
       - name: Commit the changelog
-        if: steps.changelog.outputs.changed == 'true'
+        if: steps.changelog.outputs.changed == 'true' && secrets.CHANGELOG_BOT_TOKEN != ''
         uses: lite-actions/signed-commit@v1
         with:
           branch: ${{ steps.branch.outputs.branch }}
@@ -55,7 +55,7 @@ jobs:
 
       - name: Open changelog PR
         id: pr
-        if: steps.changelog.outputs.changed == 'true'
+        if: steps.changelog.outputs.changed == 'true' && secrets.CHANGELOG_BOT_TOKEN != ''
         env:
           GH_TOKEN: ${{ secrets.CHANGELOG_BOT_TOKEN }}
           BRANCH: ${{ steps.branch.outputs.branch }}
@@ -85,6 +85,10 @@ jobs:
           GH_TOKEN="${APPROVE_TOKEN}" gh pr review "${PR_URL}" --approve \
             --body "Automated approval of changelog update."
           gh pr merge "${PR_URL}" --auto --squash --delete-branch
+
+      - name: Warn when changelog automation is skipped
+        if: steps.changelog.outputs.changed == 'true' && secrets.CHANGELOG_BOT_TOKEN == ''
+        run: echo "::warning::CHANGELOG_BOT_TOKEN not set; changelog update was generated but not committed."
 
       - name: Clean up on failure
         if: failure() && steps.changelog.outputs.changed == 'true'

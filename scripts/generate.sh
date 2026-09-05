@@ -3,6 +3,13 @@ set -euo pipefail
 
 : "${GITHUB_OUTPUT:=/dev/stdout}"
 emit() { printf '%s=%s\n' "$1" "$2" >> "${GITHUB_OUTPUT}"; }
+tmp=""
+cleanup() {
+  if [ -n "${tmp}" ]; then
+    rm -f "${tmp}"
+  fi
+}
+trap cleanup EXIT
 
 TITLE="${INPUT_TITLE:-Changelog}"
 OUT="${INPUT_OUTPUT_FILE:-CHANGELOG.md}"
