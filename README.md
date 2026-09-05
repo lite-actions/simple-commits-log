@@ -21,7 +21,9 @@ logs the latest commit that landed on `main`.
 To persist the generated changelog from a workflow, grant at least
 `permissions: { contents: write }`. If your workflow updates `main` through a
 PR like this repository does, it also needs `pull-requests: write` plus a token
-that can push or open PRs.
+that can push or open PRs. The PR-based automation in this repository also
+assumes the GitHub CLI (`gh`) is available on the runner for PR creation,
+approval, merge, and cleanup.
 
 For GitHub merge commits, the action uses the PR title line when present so
 entries still log the intended `type: message`. It also stores a hidden full-SHA

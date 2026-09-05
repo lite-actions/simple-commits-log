@@ -103,7 +103,7 @@ jobs:
           BRANCH: ${{ steps.branch.outputs.branch }}
           PR_URL: ${{ steps.pr.outputs.url }}
         run: |
-          ref_branch="$(python -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["BRANCH"], safe=""))')"
+          ref_branch="$(printf '%s' "${BRANCH}" | sed 's|/|%2F|g')"
           [ -n "${PR_URL:-}" ] && gh pr close "${PR_URL}" --delete-branch 2>/dev/null || true
           gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${ref_branch}" 2>/dev/null || true
           echo "Cleaned up ${BRANCH} (if it existed)."
