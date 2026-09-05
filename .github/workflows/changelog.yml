@@ -72,7 +72,12 @@ jobs:
           fi
           pr_url="$(gh pr create --base main --head "${BRANCH}" \
             --title "docs(changelog): update changelog" \
-            --body "Automated changelog update from the latest merge to \`main\`.")"
+            --body "Automated changelog update from the latest merge to \`main\`." \
+            2>/dev/null || true)"
+          if [ -z "${pr_url}" ]; then
+            pr_url="$(gh pr list --head "${BRANCH}" --json url --jq '.[0].url' 2>/dev/null || true)"
+          fi
+          [ -n "${pr_url}" ]
           echo "url=${pr_url}" >> "${GITHUB_OUTPUT}"
 
       - name: Approve and auto-merge changelog PR
@@ -92,12 +97,12 @@ jobs:
           gh pr merge "${PR_URL}" --auto --squash --delete-branch
 
       - name: Clean up on failure
-        if: failure() && steps.changelog.outputs.changed == 'true'
+        if: failure() && steps.branch.outputs.branch != ''
         env:
           GH_TOKEN: ${{ secrets.CHANGELOG_BOT_TOKEN }}
+          BRANCH: ${{ steps.branch.outputs.branch }}
           PR_URL: ${{ steps.pr.outputs.url }}
         run: |
-          branch="chore/changelog-${GITHUB_RUN_ID}"
           [ -n "${PR_URL:-}" ] && gh pr close "${PR_URL}" --delete-branch 2>/dev/null || true
-          gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${branch}" 2>/dev/null || true
-          echo "Cleaned up ${branch} (if it existed)."
+          gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${BRANCH}" 2>/dev/null || true
+          echo "Cleaned up ${BRANCH} (if it existed)."

@@ -44,10 +44,9 @@ fi
 
 type="other"
 message="${source_line}"
-parsed="$(printf '%s\n' "${source_line}" | sed -nE 's/^([a-z]+)(\([^)]+\))?(!)?:[[:space:]]*(.*)$/\1\t\4/p')"
-if [ -n "${parsed}" ]; then
-  type="${parsed%%	*}"
-  message="${parsed#*	}"
+if printf '%s\n' "${source_line}" | grep -Eq '^[a-z]+(\([^)]+\))?(!)?:[[:space:]]*'; then
+  type="$(printf '%s\n' "${source_line}" | sed -E 's/^([a-z]+)(\([^)]+\))?(!)?:[[:space:]]*.*/\1/')"
+  message="$(printf '%s\n' "${source_line}" | sed -E 's/^[a-z]+(\([^)]+\))?(!)?:[[:space:]]*//')"
 elif printf '%s' "${subject}" | grep -Eq '^Merge '; then
   type="merge"
 fi

@@ -63,9 +63,22 @@ line_new="$(grep -n '^handle empty payload$' CHANGELOG.md | cut -d: -f1 | head -
 line_old="$(grep -n '^add audit log$' CHANGELOG.md | cut -d: -f1 | head -n1)"
 assert "latest entry prepended" test "${line_new}" -lt "${line_old}"
 
+printf '\n== merge commit without a PR title falls back cleanly\n'
+git commit -q --allow-empty -F - <<'MSG'
+Merge pull request #13 from lite-actions/no-title
+MSG
+sha3="$(git rev-parse HEAD)"
+date3="$(git log -1 --format=%cs HEAD)"
+export GITHUB_OUTPUT="${tmp}/out3"
+GITHUB_REPOSITORY="acme/widget" INPUT_COMMIT=HEAD bash "${GEN}" >/dev/null 2>&1
+assert "merge fallback uses merge type" \
+  grep -qE "^${date3} merge \[[0-9a-f]{7,}\]\(https://github\.com/acme/widget/commit/${sha3}\) <!-- simple-commits-log:${sha3} -->$" CHANGELOG.md
+assert "merge fallback keeps the merge subject as message" \
+  grep -q '^Merge pull request #13 from lite-actions/no-title$' CHANGELOG.md
+
 printf '\n== duplicate commit does not append twice\n'
 before="$(cat CHANGELOG.md)"
-export GITHUB_OUTPUT="${tmp}/out3"
+export GITHUB_OUTPUT="${tmp}/out4"
 GITHUB_REPOSITORY="acme/widget" INPUT_COMMIT=HEAD bash "${GEN}" >/dev/null 2>&1
 assert "duplicate run leaves changelog unchanged" test "${before}" = "$(cat CHANGELOG.md)"
 assert "emits changed=false for duplicate" grep -q '^changed=false$' "${GITHUB_OUTPUT}"
