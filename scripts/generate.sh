@@ -45,9 +45,10 @@ elif printf '%s' "${subject}" | grep -Eq '^Merge '; then
 fi
 
 ref="$(render_ref)"
-entry="${date} ${type} ${ref}\n${message}\n\n"
+header="${date} ${type} ${ref}"
+entry="${header}\n${message}\n\n"
 
-if [ -f "${OUT}" ] && grep -Fq "${short_sha}" "${OUT}"; then
+if [ -f "${OUT}" ] && grep -Fqx "${header}" "${OUT}"; then
   echo "Entry for ${short_sha} already present in ${OUT}; nothing to do."
   emit changed false
   emit file "${OUT}"

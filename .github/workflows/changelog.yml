@@ -7,7 +7,8 @@ on:
       - CHANGELOG.md
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
 
 concurrency:
   group: changelog
@@ -56,12 +57,12 @@ jobs:
             echo "::warning::CHANGELOG_BOT_TOKEN / CHANGELOG_APPROVE_TOKEN not set; skipping changelog PR."
             exit 0
           fi
-          gh pr create --base main --head "${BRANCH}" \
+          pr_url="$(gh pr create --base main --head "${BRANCH}" \
             --title "docs(changelog): update changelog" \
-            --body "Automated changelog update from the latest merge to \`main\`."
-          GH_TOKEN="${APPROVE_TOKEN}" gh pr review "${BRANCH}" --approve \
+            --body "Automated changelog update from the latest merge to \`main\`.")"
+          GH_TOKEN="${APPROVE_TOKEN}" gh pr review "${pr_url}" --approve \
             --body "Automated approval of changelog update."
-          gh pr merge "${BRANCH}" --auto --squash --delete-branch
+          gh pr merge "${pr_url}" --auto --squash --delete-branch
 
       - name: Clean up on failure
         if: failure() && steps.changelog.outputs.changed == 'true'

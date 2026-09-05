@@ -7,11 +7,12 @@ log type, a short SHA, and the message on the following line.
 ## Usage
 
 ```yaml
-- uses: actions/checkout@v4
-  with:
-    fetch-depth: 0
-- uses: lite-actions/simple-commits-log@v1
-- run: cat CHANGELOG.md
+steps:
+  - uses: actions/checkout@v4
+    with:
+      fetch-depth: 0
+  - uses: lite-actions/simple-commits-log@v1
+  - run: cat CHANGELOG.md
 ```
 
 On a `push` event the action defaults to the push event's `after` SHA, so it
